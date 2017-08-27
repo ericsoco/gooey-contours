@@ -1,0 +1,41 @@
+{
+  "name": "gooey-contour",
+  "version": "0.0.1",
+  "description": "d3-contour, gooified",
+  "scripts": {
+    "start": "npm run sass && npm run watch & npm run serve",
+    "dist": "npm run js && npm run sass && npm run static",
+    "watch": "npm run js:watch & npm run sass:watch & npm run static:watch",
+    "serve": "serve dist",
+    "gh-deploy": "npm run dist && git-directory-deploy --directory dist/",
+    "js": "browserify js/main.js -o dist/bundle.js",
+    "js:watch": "watchify js/main.js -o dist/bundle.js -dv",
+    "sass": "node-sass --include-path scss scss/main.scss dist/main.css",
+    "sass:watch": "node-sass -w --include-path scss scss/main.scss dist/main.css",
+    "static": "cp -R static/ dist/",
+    "static:watch": "nodemon -w static -e html,json,csv,gif,jpg,png,svg -x \"npm run static\""
+  },
+  "author": "ericsoco",
+  "license": "ISC",
+  "devDependencies": {
+    "babel-preset-es2015": "^6.24.1",
+    "babel-preset-stage-0": "^6.24.1",
+    "babelify": "^7.3.0",
+    "browserify": "^14.4.0",
+    "git-directory-deploy": "^1.5.1",
+    "node-sass": "^4.5.3",
+    "nodemon": "^1.11.0",
+    "serve": "^6.0.6",
+    "watchify": "^3.9.0"
+  },
+  "dependencies": {
+    "babel-polyfill": "^6.23.0",
+    "d3": "^4.10.0",
+    "d3-contour": "^1.1.1"
+  },
+  "browserify": {
+    "transform": [
+      "babelify"
+    ]
+  }
+}
