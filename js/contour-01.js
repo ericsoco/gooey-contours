@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import * as d3ScaleChromatic from 'd3-scale-chromatic';
 import { contourDensity } from 'd3-contour';
 
 /**
@@ -9,7 +10,7 @@ export default function () {
 
 	const MODE_SVG = 'svg',
 		MODE_CANVAS = 'canvas',
-		MODE = MODE_SVG;
+		MODE = MODE_CANVAS;
 
 	let app,
 		width,
@@ -18,13 +19,15 @@ export default function () {
 		links;
 
 	let contourGenerator,
-		contours;
+		contours,
+		colorScale;
 
 	let graph,
 		circles;
 
 	let canvas,
-		ctx;
+		ctx,
+		path;
 
 	let attractParams = {
 		strength: {
@@ -80,8 +83,8 @@ export default function () {
 		nodes = [];
 		for (let i=0; i<NUM_NODES; i++) {
 			nodes.push({
-				x: (0.3 + 0.4 * Math.random()) * width,
-				y: (0.3 + 0.4 * Math.random()) * height,
+				// x: (0.3 + 0.4 * Math.random()) * width,
+				// y: (0.3 + 0.4 * Math.random()) * height,
 				r: RADIUS_MIN + Math.random() * RADIUS_VAR,
 				id: i
 			});
@@ -105,29 +108,6 @@ export default function () {
 				target
 			});
 		}
-
-		/*
-		const RADIUS = 4,
-
-		let xScale = d3.scaleLinear()
-				.domain([0, 24])
-				.range([margin.left, width - margin.right]),
-			yScale = d3.scalePoint()
-				.domain(organisms.map(o => o.name))
-				.range([margin.top, height - margin.bottom])
-				.padding(margin.top)
-				.round(true),
-			rScale = d3.scalePow()
-				.domain(d3.extent(allPathways, d => d.totalCount))
-				.range([RADIUS, 10*RADIUS])
-				.exponent(0.5),
-			colorScale = d3.scaleOrdinal(d3.schemeCategory10)
-				.domain(organisms.map(o => o.name)),
-			rColorScale = d3.scalePow()
-				.domain(d3.extent(allPathways, d => d.totalCount))
-				.range(['rgba(0, 0, 0, 0.1)', 'rgba(150, 30, 60, 0.3)'])
-				.exponent(0.25);
-		*/
 
 		simulation = d3.forceSimulation(nodes)
 			.force('collision', d3.forceCollide()
@@ -156,19 +136,22 @@ export default function () {
 			.x(d => d.x)
 			.y(d => d.y)
 			.size([width, height])
-			.bandwidth(40);
-			// .thresholds([1, 2, 4, 8, 16])
-			// .cellSize(16);
-
-		// console.log(contourGenerator.thresholds());
+			.bandwidth(40)
+			.thresholds(10);
+			// .cellSize(64);
 
 		if (MODE === MODE_CANVAS) {
 			canvas = app.append('canvas')
 				.attr('width', outerWidth)
 				.attr('height', outerHeight);
 			ctx = canvas.node().getContext('2d');
-			ctx.globalCompositeOperation = 'multiply';
+			// ctx.globalCompositeOperation = 'multiply';
 			ctx.translate(margin.left, margin.top);
+
+			path = d3.geoPath().context(ctx);
+			// colorScale = d3.scaleSequential(d3.interpolateRainbow);
+			colorScale = d3.scaleSequential(d3ScaleChromatic.interpolateYlGnBu);
+			// colorScale = d3.scaleSequential(d3.interpolateCool);
 		} else {
 			graph = app.append('svg')
 				.attr('width', outerWidth)
@@ -183,10 +166,6 @@ export default function () {
 				.attr('cy', d => d.y)
 				.attr('r', d => d.r);
 
-			//
-			// TODO NEXT:
-			// get these contours to update on draw()
-			//
 			contours = graph.selectAll('path')
 				.data(contourGenerator(nodes))
 				.enter().append('path')
@@ -204,22 +183,6 @@ export default function () {
 			.radius(d => collisionParams.radius.value * d.r);
 		simulation.force('attract').strength(attractParams.strength.value);
 
-		/*
-		graph.insert('g', 'g')
-			.attr('fill', 'none')
-			.attr('stroke', 'steelblue')
-			.attr('stroke-linejoin', 'round')
-		.selectAll('path')
-		.data(contourDensity()
-			.x(function(d) { return x(d.waiting); })
-			.y(function(d) { return y(d.eruptions); })
-			.size([width, height])
-			.bandwidth(40)
-			(faithful))
-		.enter().append('path')
-			.attr('d', d3.geoPath());
-		*/
-
 		draw();
 	}
 
@@ -231,15 +194,29 @@ export default function () {
 	function draw () {
 		if (MODE === MODE_CANVAS) {
 			ctx.clearRect(0, 0, width, height);
+
+			// TODO:
+			// reduce alpha of higher-index contours to work better with multiply
+			// find nice color scale
+			// fix up motion of nodes
+
+			contours = contourGenerator(nodes);
+			colorScale.domain([0, contours.length]);
+			contours.forEach((d, i) => {
+				ctx.fillStyle = colorScale(i);
+				ctx.beginPath();
+				path(d);
+				ctx.fill();
+			});
+
 			nodes.forEach(d => {
-				// ctx.strokeStyle = colorScale(d.pathway.orgName);
-				// ctx.fillStyle = colorScale(d.pathway.orgName);
-				ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+				ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+				// ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
 				// ctx.lineWidth = 3;
 				ctx.beginPath();
 				ctx.arc(d.x, d.y, d.r, 0, 2*Math.PI);
-				// ctx.stroke();
-				ctx.fill();
+				ctx.stroke();
+				// ctx.fill();
 			});
 		} else {
 			circles
