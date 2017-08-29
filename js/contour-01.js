@@ -11,6 +11,8 @@ export default function () {
 	const MODE_SVG = 'svg',
 		MODE_CANVAS = 'canvas',
 		MODE = MODE_CANVAS;
+	const SHOW_NODES = false;
+	const BLEND_MULTIPLY = true;
 
 	let app,
 		width,
@@ -31,27 +33,27 @@ export default function () {
 
 	let attractParams = {
 		strength: {
-			base: 0.5,
-			value: 0.5,
-			mod: 0.45,
-			speed: 0.1,
-			counter: Math.PI,
+			base: 16,
+			value: 16,
+			mod: 16,
+			speed: 0.01,
+			counter: 0.5 * Math.PI,
 		}
 	};
 	let collisionParams = {
 		strength: {
-			base: 1.75,
-			value: 1.75,
-			mod: 1,
-			speed: 0.25,
-			counter: 0.5 * Math.PI
+			base: 4,
+			value: 4,
+			mod: 4,
+			speed: 0.01,
+			counter: Math.PI
 		},
 		radius: {
-			base: 2,
-			value: 2,
-			mod: 0.25,
-			speed: 0.003,
-			counter: 0.75 * Math.PI
+			base: 4,
+			value: 4,
+			mod: 4,
+			speed: 0.01,
+			counter: Math.PI
 		}
 	};
 	let simulation;
@@ -77,7 +79,7 @@ export default function () {
 		height = outerHeight - margin.top - margin.bottom;
 
 		// dummy data
-		const RADIUS_MIN = 4;
+		const RADIUS_MIN = 8;
 		const RADIUS_VAR = 16;
 		const NUM_NODES = 50;
 		nodes = [];
@@ -85,17 +87,13 @@ export default function () {
 			nodes.push({
 				// x: (0.3 + 0.4 * Math.random()) * width,
 				// y: (0.3 + 0.4 * Math.random()) * height,
-				r: RADIUS_MIN + Math.random() * RADIUS_VAR,
+				// r: RADIUS_MIN + Math.random() * RADIUS_VAR,
+				r: RADIUS_MIN,
 				id: i
 			});
 		}
 
-		// randomly generate links
-		// TODO: not working yet
-		// 		 every node must have a link (not yet the case)
-		//		 some can have multiple
-		//		 therefore, walk thru all nodes instead of picking sources randomly
-		// TODO: then, apply contours
+		/*
 		const NODE_LINK_RATIO = 5;
 		const NUM_LINKS = Math.floor(NUM_NODES / NODE_LINK_RATIO);
 		let source, target;
@@ -108,6 +106,7 @@ export default function () {
 				target
 			});
 		}
+		*/
 
 		simulation = d3.forceSimulation(nodes)
 			.force('collision', d3.forceCollide()
@@ -137,7 +136,7 @@ export default function () {
 			.y(d => d.y)
 			.size([width, height])
 			.bandwidth(40)
-			.thresholds(10);
+			.thresholds(16);
 			// .cellSize(64);
 
 		if (MODE === MODE_CANVAS) {
@@ -145,13 +144,14 @@ export default function () {
 				.attr('width', outerWidth)
 				.attr('height', outerHeight);
 			ctx = canvas.node().getContext('2d');
-			// ctx.globalCompositeOperation = 'multiply';
+			if (BLEND_MULTIPLY) ctx.globalCompositeOperation = 'multiply';
 			ctx.translate(margin.left, margin.top);
 
 			path = d3.geoPath().context(ctx);
-			// colorScale = d3.scaleSequential(d3.interpolateRainbow);
-			colorScale = d3.scaleSequential(d3ScaleChromatic.interpolateYlGnBu);
-			// colorScale = d3.scaleSequential(d3.interpolateCool);
+			// colorScale = d3.scaleSequential(d3ScaleChromatic.interpolateYlGnBu);
+			colorScale = d3.scaleSequential(d3.interpolateCubehelixDefault);
+			
+			// colorScale = d3.scaleSequential(d3ScaleChromatic.interpolatePuBu);
 		} else {
 			graph = app.append('svg')
 				.attr('width', outerWidth)
@@ -195,29 +195,31 @@ export default function () {
 		if (MODE === MODE_CANVAS) {
 			ctx.clearRect(0, 0, width, height);
 
-			// TODO:
-			// reduce alpha of higher-index contours to work better with multiply
-			// find nice color scale
-			// fix up motion of nodes
-
 			contours = contourGenerator(nodes);
-			colorScale.domain([0, contours.length]);
+			const numContours = contours.length;
+			// colorScale.domain([0, (BLEND_MULTIPLY ? 1.5 : 1) * numContours]);
+			colorScale.domain([(BLEND_MULTIPLY ? 1.5 : 1) * numContours, 0]);		// reverse for cubehelix
 			contours.forEach((d, i) => {
-				ctx.fillStyle = colorScale(i);
+				let color = colorScale(i);
+				if (BLEND_MULTIPLY) {
+					color = d3.color(colorScale(i));
+					color.opacity = 1 - 0.75 * Math.pow(i / numContours, 0.75);
+				}
+				// console.log(i, color);
+				ctx.fillStyle = color;
 				ctx.beginPath();
 				path(d);
 				ctx.fill();
 			});
 
-			nodes.forEach(d => {
-				ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-				// ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-				// ctx.lineWidth = 3;
-				ctx.beginPath();
-				ctx.arc(d.x, d.y, d.r, 0, 2*Math.PI);
-				ctx.stroke();
-				// ctx.fill();
-			});
+			if (SHOW_NODES) {
+				nodes.forEach(d => {
+					ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+					ctx.beginPath();
+					ctx.arc(d.x, d.y, d.r, 0, 2*Math.PI);
+					ctx.stroke();
+				});
+			}
 		} else {
 			circles
 				.attr('cx', d => d.x)
